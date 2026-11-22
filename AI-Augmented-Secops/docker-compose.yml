@@ -1,0 +1,50 @@
+services:
+  api:
+    build: .
+    image: secops-triage-guard:latest
+    command: ["api"]
+    environment:
+      LLM_MODEL: ${LLM_MODEL:-llama3.2}
+      OLLAMA_URL: http://ollama:11434
+      SQL_DIALECT: ${SQL_DIALECT:-duckdb}
+      INTERNAL_DOMAIN_SUFFIXES: ${INTERNAL_DOMAIN_SUFFIXES:-.corp.example.com,.internal.example.net}
+      API_KEY: ${API_KEY:-}
+      DB_PATH: /var/lib/triage/db/findings.duckdb
+      RUNBOOK_STORE_PATH: /var/lib/triage/runbooks/store
+      AUDIT_LOG_PATH: /var/lib/triage/audit/audit_logs.jsonl
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - findings_db:/var/lib/triage/db
+      - runbook_store:/var/lib/triage/runbooks
+      - audit_log:/var/lib/triage/audit
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  dashboard:
+    image: secops-triage-guard:latest
+    command: ["dashboard"]
+    environment:
+      API_BASE_URL: http://api:8000
+      API_KEY: ${API_KEY:-}
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    # Pull the model once after start: docker compose exec ollama ollama pull ${LLM_MODEL:-llama3.2}
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  findings_db:
+  runbook_store:
+  audit_log:
+  ollama_models:
